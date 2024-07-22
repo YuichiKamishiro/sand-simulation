@@ -1,13 +1,14 @@
 use macroquad::prelude::*;
 
 const ROWS: i32 = 100;
-const COLS: i32 = 200;
+const COLS: i32 = 250;
 const CELL_SIZE: f32 = 5.;
+const MATRIX_SIZE: i32 = 20;
 
 // randomly gives sand colors
 fn get_sand_color() -> Color {
-    match rand::gen_range(0, 2) {
-        0 => Color::from_rgba(234, 206, 106, 255),
+    match rand::gen_range(0, 3) {
+        0 => Color::from_rgba(240, 230, 140, 255),
         1 => Color::from_rgba(242, 226, 166, 255),
         _ => Color::from_rgba(247, 235, 195, 255),
     }
@@ -25,23 +26,33 @@ fn draw_field() {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-enum Element{
+enum Element {
     Nothing,
-    Sand,
-    Termit
+    Sand(Color),
+}
+
+fn is_cursor_inside(pos: (f32, f32), x: i32, y: i32) -> bool {
+    if pos.0 + x as f32 <= (COLS as f32 * CELL_SIZE) - 1.
+        && pos.1 + y as f32 <= (ROWS as f32 * CELL_SIZE) - 1.
+    {
+        return true;
+    }
+    return false;
 }
 
 fn click_event(cells: &mut Vec<Vec<Element>>, time_since_placed: &mut f32) {
     if is_mouse_button_down(MouseButton::Left) && *time_since_placed > 0.005 {
         *time_since_placed = 0.;
         let pos = mouse_position();
-        for x in 0..20 {
-            for y in 0..20 {
-                if pos.0 + x as f32 <= (COLS as f32 * CELL_SIZE) - 1.
-                    && pos.1 + y as f32 <= (ROWS as f32 * CELL_SIZE) - 1.
-                {
+
+        for x in 0..MATRIX_SIZE {
+            for y in 0..MATRIX_SIZE {
+                println!("{y}");
+                // checking if cursor pos inside the rect
+                if is_cursor_inside(pos, x, y) {
+                    let sand_color = get_sand_color();
                     cells[((pos.1 + y as f32) / CELL_SIZE) as usize]
-                        [((pos.0 + x as f32) / CELL_SIZE) as usize] = Element::Sand;
+                        [((pos.0 + x as f32) / CELL_SIZE) as usize] = Element::Sand(sand_color);
                 }
             }
         }
@@ -54,19 +65,43 @@ fn tick_event(cells: &mut Vec<Vec<Element>>, tick_time: &mut f32) {
         let copied = cells.clone();
         for r in 0..ROWS {
             for c in 0..COLS {
+                // check if this element can go down
                 if copied[r as usize][c as usize] != Element::Nothing && r + 1 != ROWS {
+                    // check if under element nothing
                     if cells[(r + 1) as usize][c as usize] == Element::Nothing {
+                        cells[(r + 1) as usize][c as usize] = cells[r as usize][c as usize];
                         cells[r as usize][c as usize] = Element::Nothing;
-                        cells[(r + 1) as usize][c as usize] = Element::Sand;
                     } else if c + 1 != COLS
                         && cells[(r + 1) as usize][(c + 1) as usize] == Element::Nothing
+                        && c - 1 != -1
+                        && cells[(r + 1) as usize][(c - 1) as usize] == Element::Nothing
                     {
-                        cells[r as usize][c as usize] = Element::Nothing;
-                        cells[(r + 1) as usize][(c + 1) as usize] = Element::Sand;
-                    } else if c - 1 != -1 && cells[(r + 1) as usize][(c - 1) as usize] == Element::Nothing
-                    {
-                        cells[r as usize][c as usize] = Element::Nothing;
-                        cells[(r + 1) as usize][(c - 1) as usize] = Element::Sand;
+                        match rand::gen_range(0, 2) {
+                            1 => {
+                                cells[(r + 1) as usize][(c + 1) as usize] =
+                                    cells[r as usize][c as usize];
+                                cells[r as usize][c as usize] = Element::Nothing;
+                            }
+                            _ => {
+                                cells[(r + 1) as usize][(c - 1) as usize] =
+                                    cells[r as usize][c as usize];
+                                cells[r as usize][c as usize] = Element::Nothing;
+                            }
+                        }
+                    } else {
+                        if c + 1 != COLS
+                            && cells[(r + 1) as usize][(c + 1) as usize] == Element::Nothing
+                        {
+                            cells[(r + 1) as usize][(c + 1) as usize] =
+                                cells[r as usize][c as usize];
+                            cells[r as usize][c as usize] = Element::Nothing;
+                        } else if c - 1 != -1
+                            && cells[(r + 1) as usize][(c - 1) as usize] == Element::Nothing
+                        {
+                            cells[(r + 1) as usize][(c - 1) as usize] =
+                                cells[r as usize][c as usize];
+                            cells[r as usize][c as usize] = Element::Nothing;
+                        }
                     }
                 }
             }
@@ -93,13 +128,22 @@ async fn main() {
         for r in 0..ROWS {
             for c in 0..COLS {
                 if cells[r as usize][c as usize] != Element::Nothing {
-                    let sand_color = get_sand_color();
+                    let color = match cells[r as usize][c as usize] {
+                        Element::Sand(color) => color,
+                        _ => Color {
+                            r: 0.,
+                            g: 0.,
+                            b: 0.,
+                            a: 0.,
+                        },
+                    };
+
                     draw_rectangle(
                         c as f32 * CELL_SIZE,
                         r as f32 * CELL_SIZE,
                         CELL_SIZE,
                         CELL_SIZE,
-                        sand_color,
+                        color,
                     );
                 }
             }
